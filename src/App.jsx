@@ -5,7 +5,7 @@ import ProductDetails from './pages/ProductDetails';
 
 function App() {
   return (
-    <Router basename="/compression">
+    <Router basename="/raychanproducts">
       <Routes>
         <Route path="/" element={<ProductList />} />
         <Route path="/documents" element={<StandardDocuments />} />
