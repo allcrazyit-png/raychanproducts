@@ -1,8 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchProductData } from '../utils/csvLoader';
 
 const ProductList = () => {
     const navigate = useNavigate();
+    const [products, setProducts] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const data = await fetchProductData();
+                setProducts(data);
+            } catch (error) {
+                console.error("Error loading CSV data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    const filteredProducts = products.filter(product => {
+        const term = searchTerm.toLowerCase();
+        return (
+            (product['品番'] && product['品番'].toLowerCase().includes(term)) ||
+            (product['品名'] && product['品名'].toLowerCase().includes(term))
+        );
+    });
 
     return (
         <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
@@ -29,7 +55,8 @@ const ProductList = () => {
                             <input
                                 className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-xl text-slate-900 dark:text-white focus:outline-0 focus:ring-0 border-none bg-white dark:bg-[#1c2631] h-full placeholder:text-slate-400 pl-2 text-base font-normal leading-normal"
                                 placeholder="搜尋品番、品名..."
-                                defaultValue=""
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </label>
@@ -56,141 +83,84 @@ const ProductList = () => {
 
             <main className="p-4 space-y-4 max-w-md mx-auto w-full flex-1">
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">產品清單 (顯示 124 筆)</h3>
+                    <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        產品清單 (顯示 {filteredProducts.length} 筆)
+                    </h3>
                     <span className="material-symbols-outlined text-slate-400 text-lg cursor-pointer">filter_list</span>
                 </div>
 
-                {/* Product Card 1: G92D1-VU010 */}
-                <div className="bg-white dark:bg-[#1c2631] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 transition-active active:scale-[0.98]">
-                    <div className="flex p-4">
-                        <div className="w-20 h-20 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
-                            <img className="w-full h-full object-cover" alt="DUCT, HV BATTERY INTAKE" src="/assets/G92D1-VU010_main.jpg" />
-                        </div>
-                        <div className="ml-4 flex-1">
-                            <div className="flex justify-between items-start">
-                                <p className="text-primary font-bold text-sm tracking-tight leading-none mb-1 uppercase">品番: G92D1-VU010</p>
-                                <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full">生產中</span>
-                            </div>
-                            <h4 className="text-slate-900 dark:text-white font-bold text-lg leading-tight mb-2">DUCT, HV BATTERY INTAKE</h4>
-                            <div className="flex flex-wrap gap-y-1 text-slate-500 dark:text-slate-400 text-xs">
-                                <div className="flex items-center mr-3">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">directions_car</span>
-                                    <span>841W</span>
+                {loading ? (
+                    <div className="text-center py-10 text-slate-500">載入中...</div>
+                ) : (
+                    filteredProducts.map((product, index) => (
+                        <div key={index} className="bg-white dark:bg-[#1c2631] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 transition-active active:scale-[0.98]">
+                            <div className="flex p-4">
+                                <div className="w-20 h-20 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
+                                    <img
+                                        className="w-full h-full object-cover"
+                                        alt={product['品名']}
+                                        src={product['產品圖片'] ? `/raychanproducts/assets/${product['產品圖片']}` : 'https://via.placeholder.com/150?text=No+Image'}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = 'https://via.placeholder.com/150?text=No+Image';
+                                        }}
+                                    />
                                 </div>
-                                <div className="flex items-center">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">precision_manufacturing</span>
-                                    <span>550T (501機)</span>
+                                <div className="ml-4 flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-primary font-bold text-sm tracking-tight leading-none mb-1 uppercase">品番: {product['品番']}</p>
+                                        {/* Status badge - logic can be improved if status is added to CSV */}
+                                        <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full">生產中</span>
+                                    </div>
+                                    <h4 className="text-slate-900 dark:text-white font-bold text-lg leading-tight mb-2">{product['品名'] || '未命名產品'}</h4>
+                                    <div className="flex flex-wrap gap-y-1 text-slate-500 dark:text-slate-400 text-xs">
+                                        {product['車型'] && (
+                                            <div className="flex items-center mr-3">
+                                                <span className="material-symbols-outlined text-[14px] mr-1">directions_car</span>
+                                                <span>{product['車型']}</span>
+                                            </div>
+                                        )}
+                                        {product['生產機台'] && (
+                                            <div className="flex items-center">
+                                                <span className="material-symbols-outlined text-[14px] mr-1">precision_manufacturing</span>
+                                                <span>{product['生產機台']}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+                            <div className="flex border-t border-slate-100 dark:border-slate-800 p-2 gap-2 bg-slate-50/50 dark:bg-slate-800/30">
+                                <button
+                                    onClick={() => navigate(`/details?id=${encodeURIComponent(product['品番'])}`)}
+                                    className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">analytics</span>
+                                    數據詳情
+                                </button>
+                                <button
+                                    onClick={() => navigate(`/documents?id=${encodeURIComponent(product['品番'])}`)}
+                                    className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-xs font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">description</span>
+                                    標準書類
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex border-t border-slate-100 dark:border-slate-800 p-2 gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-                        <button
-                            onClick={() => navigate('/details')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">analytics</span>
-                            數據詳情
-                        </button>
-                        <button
-                            onClick={() => navigate('/documents')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-xs font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">description</span>
-                            標準書類
-                        </button>
-                    </div>
-                </div>
+                    ))
+                )}
 
-                {/* Product Card 2: 62511-VU010 */}
-                <div className="bg-white dark:bg-[#1c2631] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 transition-active active:scale-[0.98]">
-                    <div className="flex p-4">
-                        <div className="w-20 h-20 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
-                            {/* Fallback to Stitch image for missing local asset */}
-                            <img className="w-full h-full object-cover" alt="右 DECK" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHteoUfrXYQbMeHUtFOA7hwWbDVIldUFwQbU0PA5gXpWHL5l3VOfN7DUER9KfuLwwacPCkdQBPA5hK7KsyM2riS_l5N7XUQUC3uMGDdedJe8vyw57Xiu2JfQeXBiXcH21lCYuXIc2ij9cIoqiXn8um_IISh5vIXirb6PMb2ghB7u8D5zBt2a-sK2B1M9VV1zlHIAVVFvoYXAQ6TciecosPDhIXFchQwlxOvbeLfBfOHWKQ3JLDzbSTxUr4npuWNO7mylWmp3_84tRY" />
-                        </div>
-                        <div className="ml-4 flex-1">
-                            <div className="flex justify-between items-start">
-                                <p className="text-primary font-bold text-sm tracking-tight leading-none mb-1 uppercase">品番: 62511-VU010</p>
-                                <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full">生產中</span>
-                            </div>
-                            <h4 className="text-slate-900 dark:text-white font-bold text-lg leading-tight mb-2">右 DECK (後右側背板)</h4>
-                            <div className="flex flex-wrap gap-y-1 text-slate-500 dark:text-slate-400 text-xs">
-                                <div className="flex items-center mr-3">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">directions_car</span>
-                                    <span>841W</span>
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">precision_manufacturing</span>
-                                    <span>3200T (321機)</span>
-                                </div>
-                            </div>
-                        </div>
+                {!loading && filteredProducts.length === 0 && (
+                    <div className="py-10 text-center">
+                        <p className="text-slate-400 text-sm">找不到符合的產品</p>
                     </div>
-                    <div className="flex border-t border-slate-100 dark:border-slate-800 p-2 gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-                        <button
-                            onClick={() => navigate('/details')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">analytics</span>
-                            數據詳情
-                        </button>
-                        <button
-                            onClick={() => navigate('/documents')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-xs font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">description</span>
-                            標準書類
-                        </button>
-                    </div>
-                </div>
+                )}
 
-                {/* Product Card 3: 81218-X1C00 */}
-                <div className="bg-white dark:bg-[#1c2631] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 transition-active active:scale-[0.98]">
-                    <div className="flex p-4">
-                        <div className="w-20 h-20 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
-                            {/* Fallback to Stitch image for missing local asset */}
-                            <img className="w-full h-full object-cover" alt="BRACKET" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCc8UjUnKGeDSHSNWWXZqnz6ZqTt_lQCJzc5fRu0A67f7QwMeCuaFHv5GseqM08m5g56BgXxQFp12_AQwgTSgXnjvUwPPSY6DAghgOQa6xlzhK6zZ5ViUwMwaQ2p4bD64o4zaFA2YdFsOQTHa8AgFx4a-kdcfugQfhROMAV5ZyCBcuJtTzztz5BEd5fsNQ_egCuTl55kgpzQCGza-6SCOs4uDFOJ7Up3hnQApdjWoMMnevlu0-L3T5KDTupFKEiswhoR9kUJQkZgrVt" />
-                        </div>
-                        <div className="ml-4 flex-1">
-                            <div className="flex justify-between items-start">
-                                <p className="text-primary font-bold text-sm tracking-tight leading-none mb-1 uppercase">品番: 81218-X1C00</p>
-                                <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full">試模中</span>
-                            </div>
-                            <h4 className="text-slate-900 dark:text-white font-bold text-lg leading-tight mb-2">BRACKET</h4>
-                            <div className="flex flex-wrap gap-y-1 text-slate-500 dark:text-slate-400 text-xs">
-                                <div className="flex items-center mr-3">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">directions_car</span>
-                                    <span>841W</span>
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="material-symbols-outlined text-[14px] mr-1">precision_manufacturing</span>
-                                    <span>210T(213機)</span>
-                                </div>
-                            </div>
-                        </div>
+                {!loading && filteredProducts.length > 0 && (
+                    <div className="py-10 text-center">
+                        <p className="text-slate-400 text-sm">已顯示所有搜尋結果</p>
                     </div>
-                    <div className="flex border-t border-slate-100 dark:border-slate-800 p-2 gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-                        <button
-                            onClick={() => navigate('/details')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">analytics</span>
-                            數據詳情
-                        </button>
-                        <button
-                            onClick={() => navigate('/documents')}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-xs font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">description</span>
-                            標準書類
-                        </button>
-                    </div>
-                </div>
+                )}
 
-                <div className="py-10 text-center">
-                    <p className="text-slate-400 text-sm">已顯示所有搜尋結果</p>
-                </div>
             </main>
 
             {/* Bottom Navigation (Mobile Friendly) */}

@@ -1,8 +1,45 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { fetchProductData } from '../utils/csvLoader';
 
 const ProductDetails = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const productId = searchParams.get('id');
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const data = await fetchProductData();
+                const foundProduct = data.find(p => p['品番'] === productId);
+                setProduct(foundProduct);
+            } catch (error) {
+                console.error("Error loading CSV data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, [productId]);
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark text-slate-500">載入中...</div>;
+    }
+
+    if (!product) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-background-light dark:bg-background-dark text-slate-500">
+                <p className="mb-4">找不到產品資料</p>
+                <button onClick={() => navigate(-1)} className="text-primary font-bold">返回列表</button>
+            </div>
+        );
+    }
+
+    // Helper to safely parse numbers
+    const parseNumber = (val) => parseFloat(val) || 0;
+    const ctTime = parseNumber(product['CT時間(秒)']);
 
     return (
         <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
@@ -16,7 +53,7 @@ const ProductDetails = () => {
                     </button>
                     <div className="flex flex-col items-center">
                         <h1 className="text-base font-bold leading-tight">產品數據詳情</h1>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Dimension 1</span>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{product['品番']}</span>
                     </div>
                     <button className="flex items-center text-primary">
                         <span className="material-symbols-outlined">more_horiz</span>
@@ -28,21 +65,26 @@ const ProductDetails = () => {
                 {/* Product Profile Header */}
                 <div className="flex items-start gap-4 mb-6">
                     <div className="w-20 h-20 rounded-xl bg-slate-200 dark:bg-slate-800 flex-shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700">
-                        <div
-                            className="w-full h-full bg-cover bg-center"
-                            data-alt="G92D1-VU010"
-                            style={{ backgroundImage: "url('/assets/G92D1-VU010_main.jpg')" }}
-                        ></div>
+                        <img
+                            className="w-full h-full object-cover"
+                            alt={product['品番']}
+                            src={product['產品圖片'] ? `/raychanproducts/assets/${product['產品圖片']}` : 'https://via.placeholder.com/150?text=No+Image'}
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://via.placeholder.com/150?text=No+Image';
+                            }}
+                        />
                     </div>
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
+                            {/* Fallback status if no column */}
                             <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Active</span>
                             <span className="text-slate-500 text-xs">最後更新: 2023-11-20</span>
                         </div>
-                        <h2 className="text-xl font-bold dark:text-white leading-tight">G92D1-VU010</h2>
+                        <h2 className="text-xl font-bold dark:text-white leading-tight">{product['品番']}</h2>
                         <div className="mt-2 flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm text-primary">precision_manufacturing</span>
-                            <span className="text-sm font-medium bg-primary/20 text-primary px-2 py-0.5 rounded-full">550T (501機)</span>
+                            <span className="text-sm font-medium bg-primary/20 text-primary px-2 py-0.5 rounded-full">{product['生產機台'] || '未知機台'}</span>
                         </div>
                     </div>
                 </div>
@@ -56,19 +98,19 @@ const ProductDetails = () => {
                     <div className="space-y-3">
                         <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                             <span className="text-sm text-slate-500 dark:text-slate-400">產品名稱</span>
-                            <span className="text-sm font-medium">DUCT, HV BATTERY INTAKE</span>
+                            <span className="text-sm font-medium text-right">{product['品名'] || '-'}</span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                             <span className="text-sm text-slate-500 dark:text-slate-400">模具廠商</span>
-                            <span className="text-sm font-medium">源達</span>
+                            <span className="text-sm font-medium">{product['模具廠商'] || '-'}</span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
                             <span className="text-sm text-slate-500 dark:text-slate-400">車型</span>
-                            <span className="text-sm font-medium font-mono">841W</span>
+                            <span className="text-sm font-medium font-mono">{product['車型'] || '-'}</span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-sm text-slate-500 dark:text-slate-400">原料編號</span>
-                            <span className="text-sm font-medium">FTP20DY-202B</span>
+                            <span className="text-sm font-medium">{product['原料編號'] || '-'}</span>
                         </div>
                     </div>
                 </section>
@@ -85,37 +127,42 @@ const ProductDetails = () => {
                     {/* CT Highlights */}
                     <div className="grid grid-cols-2 gap-3 mb-4">
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                            <p className="text-[10px] text-slate-500 font-semibold mb-1 uppercase tracking-tight">預估 CT</p>
+                            <p className="text-[10px] text-slate-500 font-semibold mb-1 uppercase tracking-tight">標準 CT</p>
                             <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-bold">45.0</span>
+                                <span className="text-2xl font-bold">{ctTime || '-'}</span>
                                 <span className="text-xs text-slate-400">s</span>
                             </div>
                         </div>
                         <div className="bg-primary/5 dark:bg-primary/10 p-3 rounded-lg border border-primary/20">
-                            <p className="text-[10px] text-primary font-semibold mb-1 uppercase tracking-tight">實測 CT</p>
+                            <p className="text-[10px] text-primary font-semibold mb-1 uppercase tracking-tight">目標 CT</p>
+                            {/* Placeholder logic for target */}
                             <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-bold text-primary">43.8</span>
+                                <span className="text-2xl font-bold text-primary">{ctTime ? (ctTime * 0.95).toFixed(1) : '-'}</span>
                                 <span className="text-xs text-primary/70">s</span>
                             </div>
                             <div className="flex items-center text-[10px] text-emerald-500 font-bold mt-1">
                                 <span className="material-symbols-outlined text-xs">trending_down</span>
-                                <span>-2.6% (領先)</span>
+                                <span>-5% (目標)</span>
                             </div>
                         </div>
                     </div>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                            <span className="text-sm text-slate-500 dark:text-slate-400">模具穴數</span>
-                            <span className="text-sm font-medium">1 模 2 穴</span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">標準重量</span>
+                            <span className="text-sm font-medium">{product['標準重量(g)'] ? `${product['標準重量(g)']}g` : '-'}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                            <span className="text-sm text-slate-500 dark:text-slate-400">重量公差</span>
+                            <span className="text-sm font-medium">{product['重量公差'] || '-'}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-500 dark:text-slate-400">標準不良率預估</span>
-                            <span className="text-sm font-medium">1.25%</span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">標準長度</span>
+                            <span className="text-sm font-medium">{product['標準長度'] || '-'}</span>
                         </div>
                     </div>
                 </section>
 
-                {/* Section: Material Specifications */}
+                {/* Section: Material Specifications (Reused logic or simple mapping) */}
                 <section className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-primary text-xl">layers</span>
@@ -128,26 +175,13 @@ const ProductDetails = () => {
                             </div>
                             <div>
                                 <p className="text-xs text-slate-500">主要樹脂原料</p>
-                                <p className="text-sm font-bold">PP-T30S Grade A</p>
-                                <p className="text-[10px] text-slate-400">Vendor: Formosa Plastics Corp.</p>
+                                <p className="text-sm font-bold">{product['原料編號'] || '未指定'}</p>
                             </div>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-100 dark:border-amber-900/50">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-500 text-sm">rebase_edit</span>
-                                    <span className="text-xs font-bold text-amber-600 dark:text-amber-500">二次料使用規範</span>
-                                </div>
-                                <span className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold">MAX 15%</span>
-                            </div>
-                            <p className="text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
-                                僅限本品粉碎回用。嚴禁混入外部回收料。每次配料需紀錄比例並簽名核可。
-                            </p>
                         </div>
                     </div>
                 </section>
 
-                {/* Section: Packaging Parameters */}
+                {/* Section: Packaging Parameters (Using placeholders as CSV might not have full details) */}
                 <section className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-primary text-xl">inventory_2</span>
@@ -155,28 +189,12 @@ const ProductDetails = () => {
                     </div>
                     <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl mb-4 border border-slate-100 dark:border-slate-700/50">
                         <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 w-16 h-16 rounded-lg shadow-sm">
-                            <span className="text-2xl font-black text-primary">24</span>
+                            <span className="text-2xl font-black text-primary">{product['收容數'] || '-'}</span>
                             <span className="text-[9px] font-bold text-slate-400 uppercase">PCS</span>
                         </div>
                         <div>
-                            <h4 className="text-sm font-bold mb-0.5">台車收容數</h4>
-                            <p className="text-xs text-slate-500 leading-tight">標準 A-Type 鐵製台車，每車放置 4 層，每層 6 件。</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase">內材規範</span>
-                            <div className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-xs text-primary">check_circle</span>
-                                <span className="text-sm font-medium">防震珍珠棉</span>
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase">標籤位置</span>
-                            <div className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-xs text-primary">check_circle</span>
-                                <span className="text-sm font-medium">右上角 (外側)</span>
-                            </div>
+                            <h4 className="text-sm font-bold mb-0.5">出貨容器</h4>
+                            <p className="text-xs text-slate-500 leading-tight">{product['出貨容器'] || '未指定'}</p>
                         </div>
                     </div>
                 </section>
